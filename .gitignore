@@ -8,3 +8,4 @@
 builds/
 testbed/benchmarks/test
 testbed/experiments/issue-*/*/*
+.DS_Store
