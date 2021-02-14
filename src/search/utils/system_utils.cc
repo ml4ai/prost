@@ -13,7 +13,13 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
-#include "sys/sysinfo.h"
+
+#ifdef __APPLE__
+  #include <sys/sysctl.h>
+#else
+  #include "sys/sysinfo.h"
+#endif
+
 #include "sys/times.h"
 #include "sys/types.h"
 
@@ -55,12 +61,18 @@ bool SystemUtils::readFile(std::string& file, std::string& res,
 
 // returns the available total virtual memory
 long SystemUtils::getTotalVirtualMemory() {
-    struct sysinfo memInfo;
-    sysinfo(&memInfo);
-    long res = memInfo.totalram;
+    #ifdef __APPLE__
+      long res;
+      sysctlbyname("hw.memsize", &res, NULL, NULL, 0); 
+    #else
+      struct sysinfo memInfo;
+      sysinfo(&memInfo);
+      long res = memInfo.totalram;
 
-    res += memInfo.totalswap;
-    res *= memInfo.mem_unit;
+      res += memInfo.totalswap;
+      res *= memInfo.mem_unit;
+    #endif
+
     return res;
 }
 
