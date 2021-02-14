@@ -1,3 +1,8 @@
+# **ml4ai Fork**
+The main purpose of this fork is to modify the existing prost system to be compatible with 
+the Mac operating system. Once I have a working copy, I will update this readme with instructions 
+on how to setup Prost on Mac. 
+
 # Prost
 
 Prost is a probabilistic planning system that repeatedly computes which
