@@ -14,9 +14,7 @@
 #include "stdlib.h"
 #include "string.h"
 
-#ifdef __APPLE__
-  #include <sys/sysctl.h>
-#else
+#ifndef __APPLE__
   #include "sys/sysinfo.h"
 #endif
 
@@ -59,139 +57,147 @@ bool SystemUtils::readFile(std::string& file, std::string& res,
     return true;
 }
 
-// returns the available total virtual memory
-long SystemUtils::getTotalVirtualMemory() {
-    #ifdef __APPLE__
-      long res;
-      sysctlbyname("hw.memsize", &res, NULL, NULL, 0); 
-    #else
+#ifndef __APPLE__
+  
+  // returns the available total virtual memory
+  long SystemUtils::getTotalVirtualMemory() {
+        struct sysinfo memInfo;
+        sysinfo(&memInfo);
+        long res = memInfo.totalram;
+
+        res += memInfo.totalswap;
+        res *= memInfo.mem_unit;
+
+      return res;
+  }
+
+  // returns the virtual memory used (by all processes)
+  long SystemUtils::getUsedVirtualMemory() {
+      struct sysinfo memInfo;
+      sysinfo(&memInfo);
+      long res = memInfo.totalram - memInfo.freeram;
+      res += memInfo.totalswap - memInfo.freeswap;
+      res *= memInfo.mem_unit;
+      return res;
+  }
+
+  // returns the virtual memory used by this process in KB
+  int SystemUtils::getVirtualMemoryUsedByThis() {
+      FILE* file = fopen("/proc/self/status", "r");
+      int res = -1;
+      char line[128];
+
+      while (fgets(line, 128, file) != nullptr) {
+          if (strncmp(line, "VmSize:", 7) == 0) {
+              res = parseLine(line);
+              break;
+          }
+      }
+      fclose(file);
+      return res;
+  }
+
+  // returns the available total RAM
+  long SystemUtils::getTotalRAM() {
       struct sysinfo memInfo;
       sysinfo(&memInfo);
       long res = memInfo.totalram;
-
-      res += memInfo.totalswap;
       res *= memInfo.mem_unit;
-    #endif
+      return res;
+  }
 
-    return res;
-}
+  // returns the RAM used (by all processes)
+  long SystemUtils::getUsedRAM() {
+      struct sysinfo memInfo;
+      sysinfo(&memInfo);
+      long res = memInfo.totalram - memInfo.freeram;
+      res *= memInfo.mem_unit;
+      return res;
+  }
 
-// returns the virtual memory used (by all processes)
-long SystemUtils::getUsedVirtualMemory() {
-    struct sysinfo memInfo;
-    sysinfo(&memInfo);
-    long res = memInfo.totalram - memInfo.freeram;
-    res += memInfo.totalswap - memInfo.freeswap;
-    res *= memInfo.mem_unit;
-    return res;
-}
+  // inits measurement of CPU usage by this process
+  void SystemUtils::initCPUMeasurementOfThis() {
+      FILE* file;
+      struct tms timeSample;
+      char line[128];
+
+      lastCPU = times(&timeSample);
+      lastSysCPU = timeSample.tms_stime;
+      lastUserCPU = timeSample.tms_utime;
+
+      file = fopen("/proc/cpuinfo", "r");
+      numProcessors = 0;
+      while (fgets(line, 128, file) != nullptr) {
+          if (strncmp(line, "processor", 9) == 0) {
+              numProcessors++;
+          }
+      }
+      fclose(file);
+
+      CPUMeasurementOfProcessRunning = true;
+  }
+
+  double SystemUtils::getCPUUsageOfThis() {
+      if (!CPUMeasurementOfProcessRunning) {
+          return -1.0;
+      }
+
+      struct tms timeSample;
+      clock_t now;
+      double res;
+
+      now = times(&timeSample);
+      if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
+          timeSample.tms_utime < lastUserCPU) {
+          // Overflow detection. Just skip this value.
+          res = -1.0;
+      } else {
+          res = (double)(timeSample.tms_stime - lastSysCPU) +
+                (double)(timeSample.tms_utime - lastUserCPU);
+          res /= (double)(now - lastCPU);
+          res /= numProcessors;
+          res *= 100;
+      }
+      lastCPU = now;
+      lastSysCPU = timeSample.tms_stime;
+      lastUserCPU = timeSample.tms_utime;
+
+      return res;
+  }
+#endif
 
 int SystemUtils::parseLine(char* line) {
-    int i = (int)strlen(line);
-    while (*line < '0' || *line > '9') {
-        line++;
-    }
-    line[i - 3] = '\0';
-    i = atoi(line);
-    return i;
-}
-
-// returns the virtual memory used by this process in KB
-int SystemUtils::getVirtualMemoryUsedByThis() {
-    FILE* file = fopen("/proc/self/status", "r");
-    int res = -1;
-    char line[128];
-
-    while (fgets(line, 128, file) != nullptr) {
-        if (strncmp(line, "VmSize:", 7) == 0) {
-            res = parseLine(line);
-            break;
-        }
-    }
-    fclose(file);
-    return res;
-}
-
-// returns the available total RAM
-long SystemUtils::getTotalRAM() {
-    struct sysinfo memInfo;
-    sysinfo(&memInfo);
-    long res = memInfo.totalram;
-    res *= memInfo.mem_unit;
-    return res;
-}
-
-// returns the RAM used (by all processes)
-long SystemUtils::getUsedRAM() {
-    struct sysinfo memInfo;
-    sysinfo(&memInfo);
-    long res = memInfo.totalram - memInfo.freeram;
-    res *= memInfo.mem_unit;
-    return res;
+  int i = (int)strlen(line);
+  while (*line < '0' || *line > '9') {
+      line++;
+  }
+  line[i - 3] = '\0';
+  i = atoi(line);
+  return i;
 }
 
 // returns the RAM used by this process in KB
-int SystemUtils::getRAMUsedByThis() {
-    FILE* file = fopen("/proc/self/status", "r");
-    int res = -1;
-    char line[128];
+int SystemUtils::getRAMUsedByThis() { 
+#ifndef __APPLE__
+  FILE* file = fopen("/proc/self/status", "r");
+  int res = -1;
+  char line[128];
 
-    while (fgets(line, 128, file) != nullptr) {
-        if (strncmp(line, "VmRSS:", 6) == 0) {
-            res = parseLine(line);
-            break;
-        }
-    }
-    fclose(file);
-    return res;
+  while (fgets(line, 128, file) != nullptr) {
+      if (strncmp(line, "VmRSS:", 6) == 0) {
+          res = parseLine(line);
+          break;
+      }
+  }
+  fclose(file);
+  return res;
+#else
+  struct rusage usage;
+  int maxrss;
+  getrusage(0,&usage);
+  maxrss = usage.ru_maxrss*0.001;
+  return maxrss;
+#endif
 }
 
-// inits measurement of CPU usage by this process
-void SystemUtils::initCPUMeasurementOfThis() {
-    FILE* file;
-    struct tms timeSample;
-    char line[128];
 
-    lastCPU = times(&timeSample);
-    lastSysCPU = timeSample.tms_stime;
-    lastUserCPU = timeSample.tms_utime;
-
-    file = fopen("/proc/cpuinfo", "r");
-    numProcessors = 0;
-    while (fgets(line, 128, file) != nullptr) {
-        if (strncmp(line, "processor", 9) == 0) {
-            numProcessors++;
-        }
-    }
-    fclose(file);
-
-    CPUMeasurementOfProcessRunning = true;
-}
-
-double SystemUtils::getCPUUsageOfThis() {
-    if (!CPUMeasurementOfProcessRunning) {
-        return -1.0;
-    }
-
-    struct tms timeSample;
-    clock_t now;
-    double res;
-
-    now = times(&timeSample);
-    if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
-        timeSample.tms_utime < lastUserCPU) {
-        // Overflow detection. Just skip this value.
-        res = -1.0;
-    } else {
-        res = (double)(timeSample.tms_stime - lastSysCPU) +
-              (double)(timeSample.tms_utime - lastUserCPU);
-        res /= (double)(now - lastCPU);
-        res /= numProcessors;
-        res *= 100;
-    }
-    lastCPU = now;
-    lastSysCPU = timeSample.tms_stime;
-    lastUserCPU = timeSample.tms_utime;
-
-    return res;
-}

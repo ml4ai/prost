@@ -9,19 +9,20 @@ public:
 
     static bool readFile(std::string& file, std::string& res,
                          std::string ignoreSign = "");
-
+#ifndef __APPLE__
     static long getTotalVirtualMemory();
     static long getUsedVirtualMemory();
     static int getVirtualMemoryUsedByThis();
 
     static long getTotalRAM();
     static long getUsedRAM();
-    static int getRAMUsedByThis();
 
     static void initCPUMeasurementOfThis();
     static double getCPUUsageOfThis();
-
+#endif
+    static int getRAMUsedByThis();
 protected:
+
     static bool CPUMeasurementRunning;
     static bool CPUMeasurementOfProcessRunning;
 
@@ -31,7 +32,6 @@ protected:
     static int numProcessors;
 
     static int parseLine(char* line);
-
 private:
     SystemUtils() {}
 };
