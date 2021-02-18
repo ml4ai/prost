@@ -3,6 +3,32 @@ The main purpose of this fork is to modify the existing prost system to be compa
 the Mac operating system. Once I have a working copy, I will update this readme with instructions 
 on how to setup Prost on Mac. 
 
+## Prerequisites(MacOS)
+
+ * MacOS (Tested with 11.2.1)
+ * git is installed to clone the repository
+ * flex 2.6.4 or higher and bison 3.0.4 or higher are installed to parse the input
+ * cmake 
+ * gcc compiler is required, clang does not work. (Tested with gcc version 9.3.0)
+ * the BDD library [BuDDy](http://sourceforge.net/projects/buddy) is installed
+ * the theorem prover [z3](https://github.com/Z3Prover/z3) is installed
+
+All dependencies could be found using Macports (not tested with Homebrew). Note that 
+git is most likely already installed and I will leave it to the user to install and 
+setup gcc to their liking. Prost does look for the compiler using the enviroment 
+variables `CC` and `CXX`. Here is a Macport command that install all other dependencies,
+
+`sudo port install cmake bison flex buddy z3`
+
+For the rddlsim server, the steps listed below should work (ignore the `apt` call). A Java Runtime Enviroment (JRE) is needed,
+specifically the rddlsim build was tested with openjdk8. This can be downloaded using Macports as well,
+
+`sudo port install openjdk8`
+
+Ensure that the enviroment variable `JAVA_HOME = /<path_to_jre>/<jre>/Contents/Home`.
+
+After all this is done, you can try the steps in the installation section. 
+
 # Prost
 
 Prost is a probabilistic planning system that repeatedly computes which
